@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Search and Chat Page</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { color: #333; }
+        input, button { margin: 10px 0; padding: 5px; }
+        #results, #chatResponse { margin-top: 20px; }
+        .result-item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        .result-item img { max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+    <h1>Upload a File</h1>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" name="file" accept=".pdf,.jpg,.jpeg,.png">
+        <button type="submit">Upload and Index</button>
+    </form>
+    <div id="uploadStatus"></div>
+
+    <h1>Search</h1>
+    <input type="text" id="searchInput" placeholder="Enter your search query">
+    <input type="number" id="pagesInput" placeholder="Number of pages" value="3" min="1">
+    <button onclick="search()">Search</button>
+    <div id="results"></div>
+
+    <h1>Chat</h1>
+    <input type="text" id="chatInput" placeholder="Ask about the search results">
+    <button onclick="chat()">Send</button>
+    <div id="chatResponse"></div>
+
+    <script>
+        let searchResults = [];
+
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput.files.length === 0) {
+                alert('Please select a file to upload.');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            axios.post('/api/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
+            .then(response => {
+                document.getElementById('uploadStatus').innerText = response.data.success;
+                // Clear the file input
+                fileInput.value = '';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                if (error.response && error.response.data && error.response.data.error) {
+                    document.getElementById('uploadStatus').innerText = error.response.data.error;
+                } else {
+                    document.getElementById('uploadStatus').innerText = 'An error occurred during file upload.';
+                }
+            });
+        });
+
+        function search() {
+            const query = document.getElementById('searchInput').value;
+            const pages = document.getElementById('pagesInput').value;
+            axios.get(`/api/search?query=${encodeURIComponent(query)}&k=${pages}`)
+                .then(response => {
+                    searchResults = response.data;
+                    const resultsDiv = document.getElementById('results');
+                    resultsDiv.innerHTML = '<h2>Search Results</h2>';
+                    searchResults.forEach((result, index) => {
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = 'result-item';
+                        resultDiv.innerHTML = `
+                            <h3>Result ${index + 1}</h3>
+                            <p>Document ID: ${result.doc_id}</p>
+                            <p>Page Number: ${result.page_num}</p>
+                            <p>Score: ${result.score}</p>
+                            <img src="data:image/png;base64,${result.base64}" alt="Result Image">
+                        `;
+                        resultsDiv.appendChild(resultDiv);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while searching.');
+                });
+        }
+
+        function chat() {
+            const message = document.getElementById('chatInput').value;
+            const images = searchResults.map(result => result.base64);
+            axios.post('/api/chat', { message: message, images: images })
+                .then(response => {
+                    const chatResponseDiv = document.getElementById('chatResponse');
+                    chatResponseDiv.innerHTML += `<p><strong>You:</strong> ${message}</p>`;
+                    chatResponseDiv.innerHTML += `<p><strong>AI:</strong> ${response.data.response}</p>`;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while communicating with the AI.');
+                });
+        }
+    </script>
+</body>
+</html>
