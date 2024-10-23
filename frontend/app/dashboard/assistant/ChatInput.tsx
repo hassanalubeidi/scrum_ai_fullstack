@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Search, Command } from "lucide-react";
+import { Send, Search } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CommandPalette } from "./CommandPalette";
@@ -38,6 +38,11 @@ import { CommandInput } from "./CommandInput";
 interface SearchResource {
     id: string;
     base64?: string;
+}
+
+// Add proper types for the image mappings
+interface ImageContent {
+  base64: string;
 }
 
 export function ChatInput() {
@@ -83,6 +88,7 @@ export function ChatInput() {
                 return [];
             }
         } catch (error) {
+            console.error("Error searching documents:", error);
             toast({
                 title: "Search Failed",
                 description: "Failed to search documents. Please try again.",
@@ -101,7 +107,7 @@ export function ChatInput() {
             id: 'document', 
             handler: handleDocumentSearch 
         }));
-    }, [dispatch]);
+    }, [dispatch, handleDocumentSearch]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -156,7 +162,7 @@ export function ChatInput() {
                 role: 'user',
                 content: [
                     { type: "text", text: finalMessage },
-                    ...imagesToAdd.map((img: { base64: any; }) => ({
+                    ...imagesToAdd.map((img: ImageContent) => ({
                         type: "image_url",
                         image_url: { url: `data:image/jpeg;base64,${img.base64}` }
                     }))
@@ -166,7 +172,7 @@ export function ChatInput() {
 
             dispatch(sendMessage({
                 message: finalMessage,
-                images: imagesToAdd.map((img: { base64: any; }) => img.base64)
+                images: imagesToAdd.map((img: ImageContent) => img.base64)
             }));
 
             dispatch(clearContextImages());  // Add this line
@@ -247,7 +253,7 @@ export function ChatInput() {
                 </div>
                 {input.match(/@\w+\s*"[^"]*$/) && (
                     <div className="absolute right-12 text-sm text-muted-foreground">
-                        Press " or Enter to complete
+                        Press &quot; or Enter to complete
                     </div>
                 )}
                 <Button 

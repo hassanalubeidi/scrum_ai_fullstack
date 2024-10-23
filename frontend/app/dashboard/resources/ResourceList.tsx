@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useState } from 'react';
@@ -11,7 +12,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, Maximize2, MessageSquarePlus, CheckSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import Image from 'next/image';
 
 export function ResourceList() {
   const dispatch = useDispatch();
@@ -88,11 +88,9 @@ export function ResourceList() {
                 </div>
                 {resource.base64 && (
                   <div className="relative group">
-                    <Image
-                      src={`data:image/png;base64,${resource.base64}`}
+                    <img
+                      src={`data:image/jpeg;base64,${resource.base64}`}
                       alt={`Result ${index + 1}`}
-                      width={200}
-                      height={200}
                       className="mt-2 max-w-full h-auto rounded cursor-pointer"
                       style={{ maxHeight: '200px', objectFit: 'contain' }}
                       onClick={() => setSelectedImage(resource.base64 || null)}

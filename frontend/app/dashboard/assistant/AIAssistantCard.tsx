@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Image } from "lucide-react";
+import { MessageSquare, Image as ImageIcon } from "lucide-react";
 import { MessagesArea } from "./MessagesArea";
 import { ChatInput } from "./ChatInput";
 import { useSelector } from "react-redux";
@@ -21,7 +21,7 @@ export function AIAssistantCard() {
           </div>
           {contextImages.length > 0 && (
             <Badge variant="secondary" className="flex items-center">
-              <Image className="mr-1 h-3 w-3" />
+              <ImageIcon className="mr-1 h-3 w-3" />
               {contextImages.length} image{contextImages.length !== 1 ? 's' : ''} in context
             </Badge>
           )}

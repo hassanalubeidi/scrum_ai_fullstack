@@ -9,15 +9,13 @@ const nextConfig = {
     ];
   },
   images: {
+    domains: ['localhost'],
     remotePatterns: [
       {
-        protocol: 'data',
-        hostname: '*',
+        protocol: 'http',
+        hostname: 'localhost',
       },
     ],
-    dangerouslyAllowSVG: true,
-    contentDispositionType: 'attachment',
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
 };
 

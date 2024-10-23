@@ -72,7 +72,7 @@ export function CommandPalette({ isOpen, searchTerm = '', onSelect, position }: 
     <div
       ref={containerRef}
       className="absolute z-50 w-full bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 transition-opacity duration-200 ease-in-out bottom-full mb-2"
-      style={{ maxHeight: '200px', overflow: 'auto' }}
+      style={{ maxHeight: '200px', overflow: 'auto', position: 'absolute', top: position.top, left: position.left }}
     >
       <div className="p-2">
         <div className="text-sm font-medium text-gray-500 dark:text-gray-400 px-2 py-1">

@@ -3,12 +3,12 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRef, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { selectMessages, selectIsProcessing } from "./assistantSlice";
+import { selectMessages } from "./assistantSlice";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import Image from 'next/image';
 
 export function MessagesArea() {
   const messages = useSelector(selectMessages);
-  const isProcessing = useSelector(selectIsProcessing);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
@@ -54,10 +54,12 @@ export function MessagesArea() {
                     {message.content
                       .filter(c => c.type === 'image_url')
                       .map((img, idx) => (
-                        <img
+                        <Image
                           key={idx}
-                          src={img.image_url?.url}
+                          src={img.image_url?.url || ''}
                           alt={`Attached image ${idx + 1}`}
+                          width={80}
+                          height={80}
                           className="h-20 w-20 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => setSelectedImage(img.image_url?.url || null)}
                         />
