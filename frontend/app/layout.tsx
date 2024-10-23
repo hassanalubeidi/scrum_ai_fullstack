@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Provider } from "react-redux";
 import { Toaster } from "@/components/ui/toaster"
 
 const geistSans = localFont({

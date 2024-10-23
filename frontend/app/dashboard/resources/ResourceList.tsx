@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Maximize2, ArrowRightCircle, RefreshCw, MessageSquarePlus, CheckSquare } from 'lucide-react';
+import { Trash2, Maximize2, MessageSquarePlus, CheckSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import Image from 'next/image';
 
 export function ResourceList() {
   const dispatch = useDispatch();
@@ -87,11 +88,13 @@ export function ResourceList() {
                 </div>
                 {resource.base64 && (
                   <div className="relative group">
-                    <img
+                    <Image
                       src={`data:image/png;base64,${resource.base64}`}
                       alt={`Result ${index + 1}`}
+                      width={200}
+                      height={200}
                       className="mt-2 max-w-full h-auto rounded cursor-pointer"
-                      style={{ maxHeight: '200px' }}
+                      style={{ maxHeight: '200px', objectFit: 'contain' }}
                       onClick={() => setSelectedImage(resource.base64 || null)}
                     />
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
