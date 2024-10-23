@@ -1,10 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit'
 import assistantReducer from './dashboard/assistant/assistantSlice'
+import commandReducer from './dashboard/assistant/commandSlice'
 import resourceReducer from './dashboard/resources/resourceSlice'
 
 export const store = configureStore({
   reducer: {
     assistant: assistantReducer,
+    command: commandReducer,
     resources: resourceReducer,
   },
 })

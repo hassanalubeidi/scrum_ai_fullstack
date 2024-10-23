@@ -86,6 +86,12 @@ const resourceSlice = createSlice({
         resource.isSelected = false;
       });
     },
+    selectAllResources: (state) => {
+      state.resources = state.resources.map(resource => ({
+        ...resource,
+        isSelected: true
+      }));
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -117,7 +123,11 @@ const resourceSlice = createSlice({
   },
 });
 
-export const { clearResources, toggleResourceSelection, clearSelectedResources } = resourceSlice.actions;
+export const { 
+  toggleResourceSelection, 
+  clearSelectedResources, 
+  selectAllResources,  
+} = resourceSlice.actions;
 
 export const selectResources = (state: RootState) => state.resources.resources;
 export const selectSelectedResources = (state: RootState) =>

@@ -2,13 +2,13 @@
 
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectResources, toggleResourceSelection, clearSelectedResources, selectSelectedResources } from './resourceSlice';
+import { selectResources, toggleResourceSelection, clearSelectedResources, selectSelectedResources, selectAllResources } from './resourceSlice';
 import { updateContextImages } from '../assistant/assistantSlice';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Maximize2 } from 'lucide-react';
+import { Plus, Trash2, Maximize2, ArrowRightCircle, RefreshCw, MessageSquarePlus, CheckSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
@@ -40,12 +40,26 @@ export function ResourceList() {
     });
   };
 
+  const handleSelectAll = () => {
+    dispatch(selectAllResources());
+  };
+
   return (
     <Card className="p-0">
       <CardHeader>
-        <CardTitle className="text-xl font-semibold">
-          Search Results ({selectedResources.length} selected)
-        </CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-xl font-semibold">
+            Search Results ({selectedResources.length} selected)
+          </CardTitle>
+          <Button
+            variant="outline"
+            onClick={handleSelectAll}
+            disabled={resources.length === 0}
+          >
+            <CheckSquare className="mr-2 h-4 w-4" />
+            Select All
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px] pr-4">
@@ -109,8 +123,8 @@ export function ResourceList() {
           onClick={handleAddToContext}
           disabled={selectedResources.length === 0}
         >
-          <Plus className="mr-2 h-4 w-4" />
-          Add to Context
+          <MessageSquarePlus className="mr-2 h-4 w-4" />
+          Update context
         </Button>
       </CardFooter>
 

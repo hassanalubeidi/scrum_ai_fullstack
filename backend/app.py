@@ -1,26 +1,46 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for, Response, stream_with_context
 from werkzeug.utils import secure_filename
 from byaldi import RAGMultiModalModel
 import os
 import base64
+from dotenv import load_dotenv  
+import json
+import flask_cors
+
+load_dotenv()
 
 # Configure OpenAI client
 import openai
 
 openai.api_key = os.environ.get("OPENAI_AI_KEY")
 
-# Initialize RAG model
-RAG = RAGMultiModalModel.from_pretrained("vidore/colpali-v1.2")
+
 
 # Directory where uploaded files will be stored
 UPLOAD_FOLDER = 'docs/'
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
 
 app = Flask(__name__)
+flask_cors.CORS(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Ensure the upload folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Initialize RAG model
+global RAG
+
+if os.path.exists("/home/hassan/scrum-ai-backend/backend/.byaldi/test"):
+    print("Loading index from ./test")
+    RAG = RAGMultiModalModel.from_index("test")
+else:
+    RAG = RAGMultiModalModel.from_pretrained("vidore/colpali-v1.2")
+    # Build the index after loading the pretrained model
+    RAG.index(
+        index_name="test",
+        input_path=UPLOAD_FOLDER,
+        store_collection_with_index=True,
+    )
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -51,12 +71,12 @@ def upload_file():
         save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(save_path)
         try:
-            # Re-index the documents
-            RAG.index(
-                input_path=UPLOAD_FOLDER,
-                index_name="test",
+            global RAG
+            if not RAG:
+                RAG = RAGMultiModalModel.from_pretrained("vidore/colpali-v1.2")
+            RAG.add_to_index(
+                input_item=save_path,
                 store_collection_with_index=True,
-                overwrite=True
             )
             return jsonify({'success': 'File uploaded and indexed successfully'}), 200
         except Exception as e:
@@ -85,35 +105,54 @@ def api_search():
 @app.route('/api/chat', methods=['POST'])
 def api_chat():
     data = request.json
-    if not data or 'message' not in data or 'images' not in data:
-        return jsonify({'error': 'No message or images provided'}), 400
+    if not data or 'messages' not in data:
+        return jsonify({'error': 'No messages provided'}), 400
+
+    messages = data['messages']
     
-    prompt = data['message']
-    images = data['images']
-    img_type = "image/png"  # Assuming PNG format, adjust if needed
-    
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": prompt},
-            ] + [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{img_type};base64,{img}"},
-                } for img in images
-            ],
-        }
-    ]
-    
-    response = openai.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        max_tokens=4000
-    )
-    
-    ai_response = response.choices[0].message.content
-    return jsonify({'response': ai_response})
+    # Convert messages to GPT-4 Vision format
+    openai_messages = []
+    for msg in messages:
+        if msg['role'] == 'user' and isinstance(msg['content'], list):
+            openai_messages.append({
+                'role': msg['role'],
+                'content': msg['content']
+            })
+        else:
+            openai_messages.append({
+                'role': msg['role'],
+                'content': msg['content'] if isinstance(msg['content'], str) else msg['content'][0]['text']
+            })
+
+    def generate():
+        try:
+            stream = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=openai_messages,
+                max_tokens=500,
+                temperature=0.7,
+                stream=True
+            )
+
+            for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, 'content') and delta.content:
+                        # Send each token immediately
+                        yield f"data: {delta.content}\n\n"
+                    elif getattr(chunk.choices[0], 'finish_reason', None) == 'stop':
+                        yield "data: [DONE]\n\n"
+                        break
+
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return generate(), {
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'Content-Type': 'text/event-stream'
+    }
 
 if __name__ == '__main__':
     app.run(debug=True)

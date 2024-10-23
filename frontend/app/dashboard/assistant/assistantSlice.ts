@@ -3,28 +3,34 @@ import { RootState } from '../../store'; // Adjust the import path as needed
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+  hasImages?: boolean;
+  isStreaming?: boolean;
 }
 
 interface AssistantState {
   messages: Message[];
   isProcessing: boolean;
   contextImages: { id: string; base64: string }[];
+  errorMessage: string;
+  input: string;
+  selectedImage: string | null;
+  isSearching: boolean;
 }
 
 const initialState: AssistantState = {
-  messages: [{
-    role: 'system',
-    content: 'You are a helpful assistant that can answer questions and help with tasks.',
-  }, {
-    role: 'user',
-    content: 'What is the weather in Tokyo?',
-  }, {
-    role: 'assistant',
-    content: 'The weather in Tokyo is currently sunny with a temperature of 25 degrees Celsius.',
-  }],
+  messages: [
+    {
+      role: 'system',
+      content: 'You are a helpful assistant that can answer questions and help with tasks.',
+    },
+  ],
   isProcessing: false,
   contextImages: [],
+  errorMessage: '',
+  input: '',
+  selectedImage: null,
+  isSearching: false,
 }
 
 interface SendMessagePayload {
@@ -34,27 +40,94 @@ interface SendMessagePayload {
 
 export const sendMessage = createAsyncThunk(
   'assistant/sendMessage',
-  async ({ message, images = [] }: SendMessagePayload, { getState }) => {
+  async ({ message, images = [] }: SendMessagePayload, { dispatch, getState }) => {
     const state = getState() as RootState;
+    const messages = state.assistant.messages;
     const contextImages = state.assistant.contextImages.map(img => img.base64);
-
-    // Combine user-provided images with context images
     const allImages = [...images, ...contextImages];
 
-    const response = await fetch('/ai/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message, images: allImages }),
-    });
+    const userMessageContent = [
+      { type: "text", text: message },
+      ...allImages.map(img => ({
+        type: "image_url",
+        image_url: { url: `data:image/jpeg;base64,${img}` }
+      }))
+    ];
 
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
+    const conversation = [...messages, { 
+      role: 'user', 
+      content: userMessageContent,
+      hasImages: allImages.length > 0 
+    }];
+
+    // Add empty assistant message that will be streamed into
+    dispatch(addMessage({
+      role: 'assistant',
+      content: '',
+      isStreaming: true
+    }));
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Accept': 'text/event-stream',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        },
+        body: JSON.stringify({ messages: conversation }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let isStreaming = true;
+
+      while (isStreaming) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+
+        // Decode the current chunk
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n\n');
+
+        for (const line of lines) {
+          console.log(line);
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6); // Remove 'data: ' prefix
+
+            if (data === '[DONE]') {
+              isStreaming = false;
+              break;
+            }
+
+            // Check for errors
+            if (data.startsWith('{"error":')) {
+              const errorData = JSON.parse(data);
+              throw new Error(errorData.error);
+            }
+
+            // Dispatch token to update the streaming message
+            dispatch(updateStreamingMessage(data));
+          }
+        }
+      }
+
+      // Mark streaming as complete
+      dispatch(finishStreamingMessage());
+
+      return { success: true };
+    } catch (error: unknown) {
+      dispatch(setErrorMessage(
+        error instanceof Error ? error.message : 'An unknown error occurred'
+      ));
+      throw error;
     }
-
-    const data = await response.json();
-    return { userMessage: message, aiResponse: data.response };
   }
 );
 
@@ -63,54 +136,61 @@ export const assistantSlice = createSlice({
   initialState,
   reducers: {
     addMessage: (state, action: PayloadAction<Message>) => {
-      state.messages.push(action.payload);
+      console.log("action.payload", action.payload);
+      state.messages.push({
+        ...action.payload,
+        hasImages: Array.isArray(action.payload.content) && 
+          action.payload.content.some(c => c.type === 'image_url')
+      });
+    },
+    updateStreamingMessage: (state, action: PayloadAction<string>) => {
+      const lastMessage = state.messages[state.messages.length - 1];
+      if (lastMessage && lastMessage.isStreaming) {
+        if (typeof lastMessage.content === 'string') {
+          lastMessage.content += action.payload;
+        }
+      }
     },
     clearMessages: (state) => {
       state.messages = [];
     },
-    updateLastMessage: (state, action: PayloadAction<Message>) => {
-      if (state.messages.length > 0) {
-        state.messages[state.messages.length - 1] = action.payload;
+    updateContextImages: (state, action: PayloadAction<{ id: string; base64: string }[]>) => {
+      state.contextImages = action.payload;
+    },
+    clearContextImages: (state) => {
+      state.contextImages = [];
+    },
+    finishStreamingMessage: (state) => {
+      const lastMessage = state.messages[state.messages.length - 1];
+      if (lastMessage) {
+        lastMessage.isStreaming = false;
       }
     },
-    addImageToContext: (state, action: PayloadAction<{ id: string; base64: string }>) => {
-      state.contextImages.push(action.payload);
+    setErrorMessage: (state, action: PayloadAction<string>) => {
+      state.errorMessage = action.payload;
     },
-    removeImageFromContext: (state, action: PayloadAction<string>) => {
-      state.contextImages = state.contextImages.filter(img => img.id !== action.payload);
+    setInput: (state, action: PayloadAction<string>) => {
+      state.input = action.payload;
     },
-    addImagesToContext: (state, action: PayloadAction<{ id: string; base64: string }[]>) => {
-      state.contextImages = [...state.contextImages, ...action.payload];
+    setSelectedImage: (state, action: PayloadAction<string | null>) => {
+      state.selectedImage = action.payload;
     },
-    updateContextImages: (state, action: PayloadAction<{ id: string; base64: string }[]>) => {
-      const newContextImages = action.payload;
-      // Remove images that are no longer selected
-      state.contextImages = state.contextImages.filter(img => 
-        newContextImages.some(newImg => newImg.id === img.id)
-      );
-      // Add new images that aren't already in the context
-      newContextImages.forEach(newImg => {
-        if (!state.contextImages.some(img => img.id === newImg.id)) {
-          state.contextImages.push(newImg);
-        }
-      });
-    },
+    setIsSearching: (state, action: PayloadAction<boolean>) => {
+      state.isSearching = action.payload;
+    }
   },
   extraReducers: (builder) => {
     builder
       .addCase(sendMessage.pending, (state) => {
         state.isProcessing = true;
       })
-      .addCase(sendMessage.fulfilled, (state, action) => {
+      .addCase(sendMessage.fulfilled, (state) => {
         state.isProcessing = false;
-        state.messages.push({
-          role: 'user',
-          content: action.payload.userMessage,
-        });
-        state.messages.push({
-          role: 'assistant',
-          content: action.payload.aiResponse,
-        });
+        // Remove streaming flag from last message
+        const lastMessage = state.messages[state.messages.length - 1];
+        if (lastMessage) {
+          lastMessage.isStreaming = false;
+        }
       })
       .addCase(sendMessage.rejected, (state) => {
         state.isProcessing = false;
@@ -120,13 +200,27 @@ export const assistantSlice = createSlice({
         });
       });
   },
-})
+});
 
 // Action creators are generated for each case reducer function
-export const { addMessage, clearMessages, updateLastMessage, updateContextImages } = assistantSlice.actions
+export const { 
+  addMessage, 
+  clearMessages, 
+  updateContextImages, 
+  clearContextImages,
+  updateStreamingMessage,
+  finishStreamingMessage,
+  setErrorMessage,
+  setInput,
+  setSelectedImage,
+  setIsSearching 
+} = assistantSlice.actions
 
 export const selectMessages = (state: RootState) => state.assistant.messages;
 export const selectIsProcessing = (state: RootState) => state.assistant.isProcessing;
 export const selectContextImages = (state: RootState) => state.assistant.contextImages;
+export const selectInput = (state: RootState) => state.assistant.input;
+export const selectSelectedImage = (state: RootState) => state.assistant.selectedImage;
+export const selectIsSearching = (state: RootState) => state.assistant.isSearching;
 
 export default assistantSlice.reducer
