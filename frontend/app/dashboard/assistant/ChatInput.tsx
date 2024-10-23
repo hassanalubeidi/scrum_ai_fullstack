@@ -88,6 +88,7 @@ export function ChatInput() {
             }
         } catch (error) {
             console.error("Error searching documents:", error);
+            console.log("Error details:", error);
             toast({
                 title: "Search Failed",
                 description: "Failed to search documents. Please try again.",
