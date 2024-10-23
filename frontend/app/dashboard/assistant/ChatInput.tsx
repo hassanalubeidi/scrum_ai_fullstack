@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,8 +58,8 @@ export function ChatInput() {
     const isSearching = useSelector(selectIsSearching);
     const commandPaletteState = useSelector(selectCommandPaletteState);
 
-    // Command handlers
-    const handleDocumentSearch = async (query: string) => {
+    // Memoize handleDocumentSearch
+    const handleDocumentSearch = useCallback(async (query: string) => {
         dispatch(setIsSearching(true));
         try {
             const searchResponse = await dispatch(searchResources({ 
@@ -77,7 +77,6 @@ export function ChatInput() {
                     description: `Added ${searchResponse.length} relevant documents to the context.`,
                     duration: 3000,
                 });
-                // Return the images to use immediately
                 return imagesToAdd;
             } else {
                 toast({
@@ -99,7 +98,7 @@ export function ChatInput() {
         } finally {
             dispatch(setIsSearching(false));
         }
-    };
+    }, [dispatch, toast]); // Add dependencies
 
     // Register command handlers
     useEffect(() => {
@@ -107,7 +106,7 @@ export function ChatInput() {
             id: 'document', 
             handler: handleDocumentSearch 
         }));
-    }, [dispatch, handleDocumentSearch]);
+    }, [dispatch, handleDocumentSearch]); // handleDocumentSearch is now stable
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
